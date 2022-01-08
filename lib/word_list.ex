@@ -1,5 +1,4 @@
 defmodule WordList do
-  @word_list_url "https://raw.githubusercontent.com/jesstess/Scrabble/master/scrabble/sowpods.txt"
   @word_list_local "tmp/word_list.txt"
 
   def get(url, length) do
@@ -16,7 +15,7 @@ defmodule WordList do
       |> Enum.shuffle()
       |> Enum.each(fn word -> IO.binwrite(file, "#{String.downcase(word)}\n") end)
 
-      File.close(@word_list_local)
+      File.close(file)
       File.rm("#{@word_list_local}.tmp")
     end
 

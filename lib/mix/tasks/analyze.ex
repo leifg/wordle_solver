@@ -2,10 +2,9 @@ defmodule Mix.Tasks.Analyze do
   use Mix.Task
 
   @analytics_file "tmp/distribution.jsonl"
-  @batch_size 2
 
   def run([input_words_string]) do
-    input_words = String.split(input_words_string, ",") |> IO.inspect(label: "the input words")
+    input_words = String.split(input_words_string, ",")
 
     word_lengths = input_words |> Enum.map(&byte_size/1) |> Enum.uniq()
 
@@ -17,6 +16,7 @@ defmodule Mix.Tasks.Analyze do
       calculate_analytics(input_words, @analytics_file)
     end
 
+    stitch_files_together(@analytics_file)
     analyze(@analytics_file)
   end
 
@@ -44,9 +44,19 @@ defmodule Mix.Tasks.Analyze do
       end)
     end)
     |> Enum.map(&Task.await(&1, :infinity))
+  end
 
-    IO.puts("stitching together the analytics")
-    System.cmd("cat", ["#{analytics_file}.*", ">", analytics_file])
+  defp stitch_files_together(analytics_file) do
+    {:ok, file} = File.open(analytics_file, [:append])
+
+    "#{analytics_file}.*"
+    |> Path.wildcard()
+    |> Enum.each(fn thread_file ->
+      content = File.read!(thread_file)
+      IO.binwrite(file, content)
+    end)
+
+    File.close(file)
 
     IO.puts(analytics_file)
   end

@@ -11,7 +11,9 @@ defmodule Filter do
     {input_without_exact_matches, output_without_exact_matches, exact_matches_positions} =
       input_chars
       |> Stream.with_index(0)
-      |> Enum.reduce({input, target, %{}}, fn {char, index}, {remaining_input_word, remaining_output_word,  positions} ->
+      |> Enum.reduce({input, target, %{}}, fn {char, index},
+                                              {remaining_input_word, remaining_output_word,
+                                               positions} ->
         {remaining_input_word, remaining_output_word, match} =
           if String.at(target, index) == char do
             {
@@ -35,10 +37,11 @@ defmodule Filter do
       end)
 
     {_, contains_matches_positions} =
-    input_without_exact_matches
+      input_without_exact_matches
       |> String.graphemes()
       |> Stream.with_index(0)
-      |> Enum.reduce({output_without_exact_matches, %{}}, fn {char, index}, {remaining_word, positions} ->
+      |> Enum.reduce({output_without_exact_matches, %{}}, fn {char, index},
+                                                             {remaining_word, positions} ->
         if char != "." && String.contains?(remaining_word, char) do
           {
             String.replace(remaining_word, char, "."),
@@ -49,14 +52,15 @@ defmodule Filter do
         end
       end)
 
-      priority = fn match_1 = {match_type_1, _, _}, match_2 ->
-        case match_type_1 do
-          :exact_match -> match_1
-          _ -> match_2
-        end
+    priority = fn match_1 = {match_type_1, _, _}, match_2 ->
+      case match_type_1 do
+        :exact_match -> match_1
+        _ -> match_2
       end
+    end
 
-      merged_positions = exact_matches_positions
+    merged_positions =
+      exact_matches_positions
       |> Map.merge(contains_matches_positions, fn _k, v1, v2 -> priority.(v1, v2) end)
       |> Map.values()
       |> Enum.sort_by(fn {_type, index, _char} -> index end)

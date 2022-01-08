@@ -149,14 +149,14 @@ defmodule FilterTest do
       target = "sises"
 
       assert Filter.build(input, target) == %Filter{
-        positions: [
-          {:exact_match, 0, "s"},
-          {:exact_match, 1, "i"},
-          {:no_match, 2, "c"},
-          {:exact_match, 3, "e"},
-          {:exact_match, 4, "s"}
-        ]
-      }
+               positions: [
+                 {:exact_match, 0, "s"},
+                 {:exact_match, 1, "i"},
+                 {:no_match, 2, "c"},
+                 {:exact_match, 3, "e"},
+                 {:exact_match, 4, "s"}
+               ]
+             }
     end
 
     test "build filter correctly for contains matches for same letter" do
@@ -164,14 +164,14 @@ defmodule FilterTest do
       target = "piggy"
 
       assert Filter.build(input, target) == %Filter{
-        positions: [
-          {:no_match, 0, "h"},
-          {:exact_match, 1, "i"},
-          {:contains_match, 2, "p"},
-          {:no_match, 3, "p"},
-          {:exact_match, 4, "y"}
-        ]
-      }
+               positions: [
+                 {:no_match, 0, "h"},
+                 {:exact_match, 1, "i"},
+                 {:contains_match, 2, "p"},
+                 {:no_match, 3, "p"},
+                 {:exact_match, 4, "y"}
+               ]
+             }
     end
 
     test "prioritize exact match over contains match" do

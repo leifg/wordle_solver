@@ -17,7 +17,7 @@ defmodule WordleSolver do
     num_of_attempts = iterate(sorted_list, seed, target, 1)
 
     if num_of_attempts < 0 do
-      IO.puts "Couldn't find #{target} from #{seed}"
+      IO.puts("Couldn't find #{target} from #{seed}")
     end
 
     num_of_attempts
