@@ -12,15 +12,29 @@ defmodule Mix.Tasks.Analyze do
       raise "not all words are the same length"
     end
 
-    unless File.exists?(@analytics_file) do
-      calculate_analytics(input_words, @analytics_file)
-    end
+    stitch_files_together(@analytics_file)
+
+    existing_words =
+      @analytics_file
+      |> word_analytics()
+      |> Enum.map(&Map.keys/1)
+      |> List.flatten()
+      |> MapSet.new()
+
+    input_words
+    |> MapSet.new()
+    |> MapSet.difference(existing_words)
+    |> Enum.into([])
+    |> calculate_analytics(@analytics_file)
 
     stitch_files_together(@analytics_file)
     analyze(@analytics_file)
   end
 
+  defp calculate_analytics([], _analytics_file), do: :ok
+
   defp calculate_analytics(input_words = [first_word | _], analytics_file) do
+    IO.puts "Running analytics on #{inspect(input_words)}"
     length = byte_size(first_word)
 
     word_list = WordList.get(Application.get_env(:wordle_solver, :word_list_url), length)
@@ -54,7 +68,7 @@ defmodule Mix.Tasks.Analyze do
   end
 
   defp stitch_files_together(analytics_file) do
-    {:ok, file} = File.open(analytics_file, [:append])
+    {:ok, file} = File.open(analytics_file, [:write])
 
     "#{analytics_file}.*"
     |> Path.wildcard()
@@ -68,12 +82,15 @@ defmodule Mix.Tasks.Analyze do
     IO.puts(analytics_file)
   end
 
+  defp word_analytics(analytics_file) do
+    File.read!(analytics_file)
+    |> String.trim()
+    |> String.split("\n")
+    |> Enum.map(&Jason.decode!/1)
+  end
+
   defp analyze(analytics_file) do
-    word_analytics =
-      File.read!(analytics_file)
-      |> String.trim()
-      |> String.split("\n")
-      |> Enum.map(&Jason.decode!/1)
+    word_analytics = word_analytics(analytics_file)
 
     average_guess_scores =
       word_analytics
