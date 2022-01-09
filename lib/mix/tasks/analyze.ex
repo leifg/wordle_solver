@@ -3,14 +3,8 @@ defmodule Mix.Tasks.Analyze do
 
   @analytics_file "tmp/distribution.jsonl"
 
-  def run([input_words_string]) do
-    input_words = String.split(input_words_string, ",")
-
-    word_lengths = input_words |> Enum.map(&byte_size/1) |> Enum.uniq()
-
-    if Enum.count(word_lengths) > 1 do
-      raise "not all words are the same length"
-    end
+  def run(input) do
+    {word_list, input_words} = calculate_input(input)
 
     stitch_files_together(@analytics_file)
 
@@ -25,19 +19,43 @@ defmodule Mix.Tasks.Analyze do
     |> MapSet.new()
     |> MapSet.difference(existing_words)
     |> Enum.into([])
-    |> calculate_analytics(@analytics_file)
+    |> calculate_analytics(@analytics_file, word_list)
 
     stitch_files_together(@analytics_file)
     analyze(@analytics_file)
   end
 
-  defp calculate_analytics([], _analytics_file), do: :ok
-
-  defp calculate_analytics(input_words = [first_word | _], analytics_file) do
-    IO.puts "Running analytics on #{inspect(input_words)}"
-    length = byte_size(first_word)
+  defp calculate_input(["random", length, num_of_words]) do
+    length = String.to_integer(length)
+    num_of_words = String.to_integer(num_of_words)
 
     word_list = WordList.get(Application.get_env(:wordle_solver, :word_list_url), length)
+
+    input_words = word_list
+    |> Enum.shuffle
+    |> Enum.take(num_of_words)
+
+    {word_list, input_words}
+  end
+
+  defp calculate_input([input_words_string]) do
+    input_words = String.split(input_words_string, ",")
+    word_lengths = input_words |> Enum.map(&byte_size/1) |> Enum.uniq()
+
+    if Enum.count(word_lengths) > 1 do
+      raise "not all words are the same length"
+    end
+
+    word_list = WordList.get(Application.get_env(:wordle_solver, :word_list_url), List.first(word_lengths))
+
+    {word_list, input_words}
+  end
+
+  defp calculate_analytics([], _analytics_file, _word_list), do: :ok
+
+  defp calculate_analytics(input_words, analytics_file, word_list) do
+    IO.puts "Running analytics on #{inspect(input_words)}"
+
     letter_distribution = LetterDistribution.build(word_list)
 
     sorted_list =
