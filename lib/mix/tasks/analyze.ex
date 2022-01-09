@@ -22,7 +22,14 @@ defmodule Mix.Tasks.Analyze do
 
   defp calculate_analytics(input_words = [first_word | _], analytics_file) do
     length = byte_size(first_word)
+
     word_list = WordList.get(Application.get_env(:wordle_solver, :word_list_url), length)
+    letter_distribution = LetterDistribution.build(word_list)
+
+    sorted_list =
+      word_list
+      |> Enum.sort_by(fn word -> LetterDistribution.rank_word(letter_distribution, word) end)
+      |> Enum.reverse()
 
     1..Enum.count(input_words)
     |> Enum.zip(input_words)
@@ -32,7 +39,7 @@ defmodule Mix.Tasks.Analyze do
 
         distribution =
           Enum.map(word_list, fn target_word ->
-            {target_word, WordleSolver.solve(target_word, start_word, word_list)}
+            {target_word, WordleSolver.quick_solve(target_word, start_word, sorted_list)}
           end)
           |> Enum.into(%{})
 
