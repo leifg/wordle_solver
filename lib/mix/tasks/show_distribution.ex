@@ -1,7 +1,7 @@
 defmodule Mix.Tasks.ShowDistribution do
   use Mix.Task
 
-  @num_of_top_words 10
+  @num_of_top_words 100
 
   def run([length_string]) do
     length = String.to_integer(length_string)
@@ -18,7 +18,7 @@ defmodule Mix.Tasks.ShowDistribution do
     word_list
     |> Enum.map(fn word -> LetterDistribution.rank_word(letter_distribution, word) end)
     |> Enum.sort()
-    # |> Enum.reverse()
+    |> Enum.reverse()
     |> Enum.take(@num_of_top_words)
     |> IO.inspect(label: "highest ranking words", limit: :infinity)
   end
