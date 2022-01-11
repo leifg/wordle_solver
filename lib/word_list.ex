@@ -12,7 +12,6 @@ defmodule WordList do
 
       content
       |> String.split("\n")
-      |> Enum.shuffle()
       |> Enum.each(fn word -> IO.binwrite(file, "#{String.downcase(word)}\n") end)
 
       File.close(file)
