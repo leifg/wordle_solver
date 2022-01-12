@@ -1,15 +1,34 @@
 defmodule Mix.Tasks.Analyze do
   use Mix.Task
 
-  @analytics_file "tmp/distribution.jsonl"
+  @defaults [
+    file: "tmp/distribution.jsonl",
+    threads: 10,
+    length: 5,
+    words: 10
+  ]
 
-  def run(input) do
-    {word_list, input_words} = calculate_input(input)
+  @options [
+    file: :string,
+    threads: :integer,
+    length: :integer,
+    words: :integer
+  ]
 
-    stitch_files_together(@analytics_file)
+  def run(args) do
+    {arguments, [switch], []} =
+      OptionParser.parse(args, strict: @options) |> IO.inspect(label: "parsed")
+
+    arguments = @defaults |> Keyword.merge(arguments) |> Map.new() |> IO.inspect(label: "merged")
+
+    {word_list, input_words} = calculate_input(switch, arguments)
+
+    analytics_file = arguments[:file]
+
+    stitch_files_together(analytics_file)
 
     existing_words =
-      @analytics_file
+      analytics_file
       |> word_analytics()
       |> Enum.map(&Map.keys/1)
       |> List.flatten()
@@ -19,26 +38,33 @@ defmodule Mix.Tasks.Analyze do
     |> MapSet.new()
     |> MapSet.difference(existing_words)
     |> Enum.into([])
-    |> calculate_analytics(@analytics_file, word_list)
+    |> calculate_analytics(analytics_file, word_list, arguments[:threads])
 
-    stitch_files_together(@analytics_file)
-    analyze(@analytics_file)
+    stitch_files_together(analytics_file)
+    analyze(analytics_file)
   end
 
-  defp calculate_input(["random", length, num_of_words]) do
+  defp calculate_input("random", %{length: length, words: num_of_words}) do
     length = String.to_integer(length)
     num_of_words = String.to_integer(num_of_words)
 
     word_list = WordList.get(Application.get_env(:wordle_solver, :word_list_url), length)
 
-    input_words = word_list
-    |> Enum.shuffle
-    |> Enum.take(num_of_words)
+    input_words =
+      word_list
+      |> Enum.shuffle()
+      |> Enum.take(num_of_words)
 
     {word_list, input_words}
   end
 
-  defp calculate_input([input_words_string]) do
+  defp calculate_input("all", %{length: length}) do
+    word_list = WordList.get(Application.get_env(:wordle_solver, :word_list_url), length)
+
+    {word_list, word_list}
+  end
+
+  defp calculate_input(input_words_string, _) do
     input_words = String.split(input_words_string, ",")
     word_lengths = input_words |> Enum.map(&byte_size/1) |> Enum.uniq()
 
@@ -46,15 +72,16 @@ defmodule Mix.Tasks.Analyze do
       raise "not all words are the same length"
     end
 
-    word_list = WordList.get(Application.get_env(:wordle_solver, :word_list_url), List.first(word_lengths))
+    word_list =
+      WordList.get(Application.get_env(:wordle_solver, :word_list_url), List.first(word_lengths))
 
     {word_list, input_words}
   end
 
-  defp calculate_analytics([], _analytics_file, _word_list), do: :ok
+  defp calculate_analytics([], _analytics_file, _word_list, _threads), do: :ok
 
-  defp calculate_analytics(input_words, analytics_file, word_list) do
-    IO.puts "Running analytics on #{inspect(input_words)}"
+  defp calculate_analytics(input_words, analytics_file, word_list, threads) do
+    IO.puts("Running analytics on #{inspect(input_words)}")
 
     letter_distribution = LetterDistribution.build(word_list)
 
@@ -63,25 +90,31 @@ defmodule Mix.Tasks.Analyze do
       |> Enum.sort_by(fn word -> LetterDistribution.rank_word(letter_distribution, word) end)
       |> Enum.reverse()
 
-    1..Enum.count(input_words)
-    |> Enum.zip(input_words)
-    |> Enum.map(fn {i, start_word} ->
+    batch_size = max(div(Enum.count(sorted_list), threads), 1)
+
+    input_words
+    |> Enum.chunk_every(batch_size)
+    |> Stream.with_index(1)
+    |> Enum.map(fn {word_batch, i} ->
       Task.async(fn ->
-        IO.puts("write distribution for #{start_word} (Thread #{i})")
+        Enum.each(word_batch, fn start_word ->
+          IO.puts("write distribution for #{start_word} (Thread #{i})")
 
-        distribution =
-          Enum.map(word_list, fn target_word ->
-            {target_word, WordleSolver.quick_solve(target_word, start_word, sorted_list)}
-          end)
-          |> Enum.into(%{})
+          distribution =
+            Enum.map(word_list, fn target_word ->
+              {target_word, WordleSolver.quick_solve(target_word, start_word, sorted_list)}
+            end)
+            |> Enum.into(%{})
 
-        row = %{start_word => distribution} |> Jason.encode!()
+          row = %{start_word => distribution} |> Jason.encode!()
 
-        {:ok, file} = File.open("#{analytics_file}.#{i}", [:append])
-        IO.binwrite(file, "#{row}\n")
-        File.close(file)
+          {:ok, file} = File.open("#{analytics_file}.#{i}", [:append])
+          IO.binwrite(file, "#{row}\n")
+          File.close(file)
+        end)
       end)
     end)
+    |> List.flatten()
     |> Enum.map(&Task.await(&1, :infinity))
   end
 
@@ -102,8 +135,8 @@ defmodule Mix.Tasks.Analyze do
 
   defp word_analytics(analytics_file) do
     File.read!(analytics_file)
-    |> String.trim()
     |> String.split("\n")
+    |> Enum.reject(fn row -> String.trim(row) == "" end)
     |> Enum.map(&Jason.decode!/1)
   end
 
