@@ -52,4 +52,27 @@ Example
 mix analyze water,tiger,crazy
 ```
 
+You can pass in the number of threads you want to use via the `--threads` flag (Default is 10 or number of words you pass in, whichever is lower).
+
+
+```shell
+mix analyze --threads 2 water,tiger,crazy
+```
+
+If you want a random set of words, pass in the argument `random`, you can optionally specify the word length (defaults to 5).
+
+
+This will use 100 random words from the word list with a word length of 5
+
+```shell
+mix analyze --length 5 --words 100 random
+```
+
+If you really want to go over all words, use the argument all:
+
+```shell
+mix analyze --length 5 all
+```
+
+
 This will create a `tmp/distribution.jsonl` file where every line shows the guesses needed for every other word. Additionally it will print out how many words need more than 6 guesses to find.
